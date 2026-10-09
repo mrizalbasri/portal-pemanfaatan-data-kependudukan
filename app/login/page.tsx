@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { ArrowRight, Building2, Check, CircleHelp, Eye, EyeOff, KeyRound, Landmark, LockKeyhole, ShieldCheck, UserRound } from "lucide-react";
 import Emblem from "../components/emblem";
 import { DEMO_PASSWORD, DEMO_USERNAME, startDemoSession } from "../lib/demo-session";
+import { requestedModule } from "../lib/portal-access";
+import Link from "next/link";
 
 export default function Login() {
   const router = useRouter();
@@ -22,7 +24,7 @@ export default function Login() {
       return;
     }
     setSubmitting(true);
-    try { startDemoSession(); router.replace("/"); }
+    try { startDemoSession(); const destination = requestedModule(window.location.search); router.replace(destination === "beranda" ? "/" : `/?layanan=${destination}`); }
     catch { setError("Penyimpanan sesi tidak tersedia. Aktifkan penyimpanan situs di browser untuk mencoba login demo."); setSubmitting(false); }
   }
 
@@ -33,7 +35,7 @@ export default function Login() {
       <div className="login-story-footer"><ShieldCheck size={16} /><span>Portal Pemanfaatan Data Kependudukan</span><span className="login-version">DEMO 1.0</span></div>
     </section>
 
-    <section className="login-form-section"><div className="login-topline"><span className="login-demo-dot" /> MODE DEMO <span>LAYANAN KELEMBAGAAN</span></div><div className="login-form-container"><div className="login-mobile-brand"><Emblem /><span>DUKCAPIL<small>Layanan Kelembagaan</small></span></div><span className="login-lock"><LockKeyhole size={25} strokeWidth={1.7} /></span><div className="eyebrow">SELAMAT DATANG DI PORTAL</div><h2>Masuk ke akun Anda</h2><p className="login-intro">Silakan masuk untuk mengakses layanan<br />pemanfaatan data dan manajemen kelembagaan.</p>
+    <section className="login-form-section"><div className="login-topline"><span className="login-demo-dot" /> MODE DEMO <span>LAYANAN KELEMBAGAAN</span></div><div className="login-form-container"><Link href="/" className="login-back-link">← Kembali ke beranda publik</Link><div className="login-mobile-brand"><Emblem /><span>DUKCAPIL<small>Layanan Kelembagaan</small></span></div><span className="login-lock"><LockKeyhole size={25} strokeWidth={1.7} /></span><div className="eyebrow">AKSES LAYANAN LEMBAGA</div><h2>Masuk ke akun Anda</h2><p className="login-intro">Silakan masuk untuk mengakses layanan<br />pemanfaatan data dan manajemen kelembagaan.</p>
       <form onSubmit={submit} className="login-form">
         <label htmlFor="username">Username</label><div className={`login-input ${error ? "has-error" : ""}`}><UserRound size={18} /><input id="username" name="username" autoComplete="username" autoCapitalize="none" spellCheck={false} placeholder="Masukkan username Anda" required maxLength={100} value={username} onChange={event => { setUsername(event.target.value); setError(""); }} aria-invalid={Boolean(error)} aria-describedby={error ? "login-error" : undefined} /></div>
         <label htmlFor="password">Kata sandi</label><div className={`login-input ${error ? "has-error" : ""}`}><KeyRound size={18} /><input id="password" name="password" type={showPassword ? "text" : "password"} autoComplete="current-password" placeholder="Masukkan kata sandi Anda" required maxLength={100} value={password} onChange={event => { setPassword(event.target.value); setError(""); }} aria-invalid={Boolean(error)} aria-describedby={error ? "login-error" : undefined} /><button type="button" aria-label={showPassword ? "Sembunyikan kata sandi" : "Tampilkan kata sandi"} aria-pressed={showPassword} onClick={() => setShowPassword(!showPassword)}>{showPassword ? <EyeOff size={18} /> : <Eye size={18} />}</button></div>

@@ -1,7 +1,7 @@
 // This browser-only session supports the dummy UI; it is not production authentication.
 const SESSION_KEY = "dukcapil-demo-session";
 const SESSION_DURATION = 8 * 60 * 60 * 1000;
-// Reset by a full page load so every new visit starts at the login form.
+// A new page load starts in public mode; signing in unlocks institution services.
 let signedInOnThisPage = false;
 
 export const DEMO_USERNAME = "admin";

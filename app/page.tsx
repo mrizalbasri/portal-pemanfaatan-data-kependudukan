@@ -2,11 +2,11 @@
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import Emblem from "./components/emblem";
-import DemoGate from "./components/demo-gate";
-import { endDemoSession } from "./lib/demo-session";
+import { useRouter } from "next/navigation";
+import { endDemoSession, hasDemoSession } from "./lib/demo-session";
+import { isPublicModule, requestedModule, type ModuleId } from "./lib/portal-access";
 import { ArrowDownToLine, ArrowRight, Bell, BookOpen, Building2, ChartNoAxesCombined, Check, ChevronDown, ChevronLeft, ChevronRight, CircleHelp, ClipboardList, Clock3, Code2, ExternalLink, FileCheck2, FileText, Headphones, House, KeyRound, Landmark, Menu, MessageSquare, Plus, Search, Send, ShieldCheck, Users, X, type LucideIcon } from "lucide-react";
 
-type ModuleId = "beranda" | "informasi" | "regulasi" | "prosedur" | "lembaga" | "pks" | "akses" | "sandbox" | "monitoring" | "pengaduan";
 type Row = { name: string; detail: string; date: string; status: string; description?: string };
 const modules: { id: ModuleId; name: string; nav?: string; description: string; icon: LucideIcon; count: string; color: string }[] = [
   { id: "informasi", name: "Informasi Pemanfaatan Data", description: "Temukan informasi dan panduan pemanfaatan data kependudukan.", icon: FileText, count: "12 informasi tersedia", color: "blue" },
@@ -66,9 +66,9 @@ const activity = [
   { icon: Building2, title: "Pendaftaran lembaga pengguna", detail: "Dinas Pendidikan", time: "2 jam lalu", status: "Verifikasi", color: "indigo" },
 ];
 function Badge({ children }: { children: string }) { return <span className={`badge ${["Diproses", "Verifikasi"].includes(children) ? "pending" : "success"}`}>{children}</span>; }
-export default function DashboardPage() { return <DemoGate><Dashboard /></DemoGate>; }
-
-function Dashboard() {
+export default function Dashboard() {
+  const router = useRouter();
+  const [signedIn, setSignedIn] = useState(false);
   const [active, setActive] = useState<ModuleId>("beranda");
   const [sidebar, setSidebar] = useState(false);
   const [search, setSearch] = useState("");
@@ -80,6 +80,26 @@ function Dashboard() {
   const [sandboxResult, setSandboxResult] = useState(false);
   const [sandboxId, setSandboxId] = useState("DEMO-0001");
   const [sandboxError, setSandboxError] = useState("");
+  useEffect(() => {
+    const authenticated = hasDemoSession();
+    setSignedIn(authenticated);
+    const destination = requestedModule(window.location.search);
+    if (isPublicModule(destination) || authenticated) setActive(destination);
+    else router.replace(`/login?layanan=${destination}`);
+  }, [router]);
+  useEffect(() => {
+    function checkSession() {
+      const authenticated = hasDemoSession();
+      setSignedIn(authenticated);
+      if (!authenticated && !isPublicModule(active)) {
+        setActive("beranda"); setDialog(null); setSelected(null); setPopover(null);
+        router.replace("/");
+      }
+    }
+    window.addEventListener("focus", checkSession);
+    const timer = window.setInterval(checkSession, 30_000);
+    return () => { window.removeEventListener("focus", checkSession); window.clearInterval(timer); };
+  }, [active, router]);
   const modalRef = useRef<HTMLElement>(null);
   useEffect(() => {
     if (!dialog && !selected) return;
@@ -101,7 +121,14 @@ function Dashboard() {
   const title = active === "beranda" ? "Beranda" : modules.find(m => m.id === active)?.name || nav.find(m => m.id === active)?.name || "";
   const currentRows = (localRows[active] || []).filter(r => `${r.name} ${r.detail} ${r.status}`.toLowerCase().includes(search.toLowerCase()));
   const visibleModules = modules.filter(m => `${m.name} ${m.description}`.toLowerCase().includes(search.toLowerCase()));
-  function navigate(id: ModuleId) { setActive(id); setSearch(""); setSidebar(false); setPopover(null); }
+  function navigate(id: ModuleId) {
+    if (!isPublicModule(id) && !hasDemoSession()) {
+      setSidebar(false); setPopover(null); setDialog(null);
+      router.push(`/login?layanan=${id}`);
+      return;
+    }
+    setActive(id); setSearch(""); setSidebar(false); setPopover(null);
+  }
   function notify(message: string) { setToast(message); }
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -121,26 +148,26 @@ function Dashboard() {
     <aside className={`sidebar ${sidebar ? "is-open" : ""}`}>
       <a href="#" className="brand" onClick={e => { e.preventDefault(); navigate("beranda"); }}><Emblem /><span><strong>DUKCAPIL</strong><small>LAYANAN KELEMBAGAAN</small></span></a>
       <div className="sidebar-label">MENU UTAMA</div>
-      <nav aria-label="Navigasi utama">{nav.map(item => <button key={item.id} className={`nav-item ${active === item.id ? "active" : ""}`} onClick={() => navigate(item.id)} aria-current={active === item.id ? "page" : undefined}><item.icon size={19} strokeWidth={1.8} /><span>{item.name}</span>{active === item.id && <ChevronRight size={16} />}{item.id === "pks" && active !== item.id && <span className="nav-count">3</span>}</button>)}</nav>
+      <nav aria-label="Navigasi utama">{nav.filter(item => signedIn || isPublicModule(item.id)).map(item => <button key={item.id} className={`nav-item ${active === item.id ? "active" : ""}`} onClick={() => navigate(item.id)} aria-current={active === item.id ? "page" : undefined}><item.icon size={19} strokeWidth={1.8} /><span>{item.name}</span>{active === item.id && <ChevronRight size={16} />}{item.id === "pks" && active !== item.id && <span className="nav-count">3</span>}</button>)}</nav>
       <div className="sidebar-bottom"><div className="help-card"><span className="help-icon"><Headphones size={22} /></span><strong>Butuh bantuan?</strong><p>Tim kami siap membantu Anda.</p><button onClick={() => setDialog("help")}>Hubungi Helpdesk <ArrowRight size={14} /></button></div><div className="sidebar-foot"><ShieldCheck size={14} /><span>Data terlindungi & terintegrasi</span></div></div>
     </aside>
 
     <div className="main-shell">
-      <header className="topbar"><div className="header-left"><button className="icon-button mobile-menu" aria-label="Buka navigasi" onClick={() => setSidebar(true)}><Menu size={22} /></button><div><strong>Portal Pemanfaatan Data Kependudukan</strong><p>Sistem Manajemen Kelembagaan</p></div></div><div className="header-actions"><span className="environment"><span /> Mode Demo</span><div className="popover-anchor"><button className="icon-button notification-button" aria-label="Buka notifikasi" aria-expanded={popover === "notifications"} onClick={() => setPopover(popover === "notifications" ? null : "notifications")}><Bell size={21} /><i /></button>{popover === "notifications" && <div className="popover"><strong>Notifikasi demo</strong><p>PKS Dinas Kesehatan telah diverifikasi.</p><p>3 pengajuan menunggu pemeriksaan.</p><button onClick={() => navigate("pks")}>Lihat pengajuan <ArrowRight size={14} /></button></div>}</div><div className="header-divider" /><div className="popover-anchor"><button className="profile" aria-expanded={popover === "profile"} onClick={() => setPopover(popover === "profile" ? null : "profile")}><span className="avatar">AD</span><span className="profile-info"><strong>Admin Dukcapil</strong><small>Administrator</small></span><ChevronDown size={15} /></button>{popover === "profile" && <div className="popover"><strong>Admin Dukcapil</strong><p>Akun contoh · Administrator</p><p>Anda sedang menggunakan versi demo dengan data sintetis.</p><button onClick={() => { endDemoSession(); window.location.replace("/login"); }}>Keluar dari akun <ArrowRight size={15} /></button><button onClick={() => { setPopover(null); setDialog("help"); }}>Pusat bantuan <CircleHelp size={15} /></button></div>}</div></div></header>
+      <header className="topbar"><div className="header-left"><button className="icon-button mobile-menu" aria-label="Buka navigasi" onClick={() => setSidebar(true)}><Menu size={22} /></button><div><strong>Portal Pemanfaatan Data Kependudukan</strong><p>Sistem Manajemen Kelembagaan</p></div></div><div className="header-actions"><span className="environment"><span /> Mode Demo</span><div className="popover-anchor"><button className="icon-button notification-button" aria-label="Buka notifikasi" aria-expanded={popover === "notifications"} onClick={() => setPopover(popover === "notifications" ? null : "notifications")}><Bell size={21} /><i /></button>{popover === "notifications" && <div className="popover"><strong>Notifikasi demo</strong><p>PKS Dinas Kesehatan telah diverifikasi.</p><p>3 pengajuan menunggu pemeriksaan.</p><button onClick={() => navigate("pks")}>Lihat pengajuan <ArrowRight size={14} /></button></div>}</div><div className="header-divider" />{signedIn ? <div className="popover-anchor"><button className="profile" aria-expanded={popover === "profile"} onClick={() => setPopover(popover === "profile" ? null : "profile")}><span className="avatar">AD</span><span className="profile-info"><strong>Admin Dukcapil</strong><small>Administrator</small></span><ChevronDown size={15} /></button>{popover === "profile" && <div className="popover"><strong>Admin Dukcapil</strong><p>Akun contoh · Administrator</p><p>Anda sedang menggunakan versi demo dengan data sintetis.</p><button onClick={() => { endDemoSession(); window.location.replace("/"); }}>Keluar dari akun <ArrowRight size={15} /></button><button onClick={() => { setPopover(null); setDialog("help"); }}>Pusat bantuan <CircleHelp size={15} /></button></div>}</div> : <button className="public-login-button" onClick={() => router.push("/login")}>Masuk Lembaga <ArrowRight size={15} /></button>}</div></header>
 
       <main>
         <div className="breadcrumb"><House size={14} /><ChevronRight size={12} /><span>{title}</span></div>
-        <section className="page-heading"><div><div className="eyebrow">PORTAL LAYANAN KELEMBAGAAN</div><h1>{active === "beranda" ? "Selamat datang, Admin" : title}{active === "beranda" && <span className="greeting-dot">.</span>}</h1><p>{active === "beranda" ? "Kelola pemanfaatan data kependudukan dalam satu portal terintegrasi." : "Kelola dan pantau layanan kelembagaan Anda dengan mudah."}</p></div><div className="date-label"><Clock3 size={16} /><span>Jumat, 9 Oktober 2026</span></div></section>
+        <section className="page-heading"><div><div className="eyebrow">PORTAL LAYANAN KELEMBAGAAN</div><h1>{active === "beranda" ? (signedIn ? "Selamat datang, Admin" : "Selamat datang di Portal") : title}{active === "beranda" && <span className="greeting-dot">.</span>}</h1><p>{active === "beranda" ? "Kelola pemanfaatan data kependudukan dalam satu portal terintegrasi." : "Kelola dan pantau layanan kelembagaan Anda dengan mudah."}</p></div><div className="date-label"><Clock3 size={16} /><span>Jumat, 9 Oktober 2026</span></div></section>
 
         {active === "beranda" && <>
-          <section className="welcome-banner"><div className="banner-copy"><span className="banner-label"><span /> TERHUBUNG UNTUK PELAYANAN YANG LEBIH BAIK</span><h2>Data yang terintegrasi.<br />Pelayanan yang lebih berarti.</h2><p>Akses layanan, kelola kerja sama, dan optimalkan pemanfaatan<br className="desktop-break" /> data kependudukan untuk pelayanan publik yang lebih baik.</p><button onClick={() => navigate("prosedur")}>Pelajari alur layanan <ArrowRight size={16} /></button></div><div className="banner-art" aria-hidden="true"><div className="orbit orbit-one" /><div className="orbit orbit-two" /><div className="orbit orbit-three" /><div className="art-line line-one" /><div className="art-line line-two" /><div className="art-central"><Landmark size={57} strokeWidth={1.25} /></div><div className="art-node node-one"><Users size={25} /></div><div className="art-node node-two"><ShieldCheck size={26} /></div><div className="art-node node-three"><FileCheck2 size={24} /></div><div className="art-node node-four"><Building2 size={23} /></div><span className="art-spark spark-one" /><span className="art-spark spark-two" /><span className="art-spark spark-three" /></div></section>
+          <section className="welcome-banner"><div className="banner-copy"><span className="banner-label"><span /> TERHUBUNG UNTUK PELAYANAN YANG LEBIH BAIK</span><h2>Data yang terintegrasi.<br />Pelayanan yang lebih berarti.</h2><p>Akses layanan, kelola kerja sama, dan optimalkan pemanfaatan<br className="desktop-break" /> data kependudukan untuk pelayanan publik yang lebih baik.</p><button onClick={() => navigate("prosedur")}>Prosedur layanan <ArrowRight size={16} /></button></div><div className="banner-art" aria-hidden="true"><div className="orbit orbit-one" /><div className="orbit orbit-two" /><div className="orbit orbit-three" /><div className="art-line line-one" /><div className="art-line line-two" /><div className="art-central"><Landmark size={57} strokeWidth={1.25} /></div><div className="art-node node-one"><Users size={25} /></div><div className="art-node node-two"><ShieldCheck size={26} /></div><div className="art-node node-three"><FileCheck2 size={24} /></div><div className="art-node node-four"><Building2 size={23} /></div><span className="art-spark spark-one" /><span className="art-spark spark-two" /><span className="art-spark spark-three" /></div></section>
           <section className="stats" aria-label="Ringkasan data contoh">{[
             { icon: Building2, value: "128", label: "Lembaga Pengguna", note: "+8 bulan ini", color: "blue" },
             { icon: FileCheck2, value: "24", label: "PKS Aktif", note: "+3 bulan ini", color: "teal" },
             { icon: KeyRound, value: "86", label: "Hak Akses Aktif", note: "Terintegrasi", color: "indigo" },
             { icon: Clock3, value: "7", label: "Pengajuan Diproses", note: "Menunggu tindak lanjut", color: "amber" },
           ].map(stat => <div className="stat" key={stat.label}><span className={`stat-icon ${stat.color}`}><stat.icon size={22} /></span><div><div className="stat-value">{stat.value}<span className={stat.color === "amber" ? "stat-note neutral" : "stat-note"}>{stat.note}</span></div><p>{stat.label}</p></div></div>)}</section>
-          <section className="services"><div className="section-heading"><div><h2>Layanan utama</h2><p>Akses cepat layanan pemanfaatan data kependudukan</p></div><span className="section-meta">6 layanan tersedia</span></div><div className="service-grid">{visibleModules.map((item, index) => <button className="service-card" key={item.id} style={{ animationDelay: `${index * 45}ms` }} onClick={() => navigate(item.id)}><div className="card-top"><span className={`service-icon ${item.color}`}><item.icon size={29} strokeWidth={1.7} /></span><span className="service-arrow"><ArrowRight size={19} /></span></div><h3>{item.name}</h3><p>{item.description}</p><div className="card-footer"><span className={`small-dot ${item.color}`} />{item.count}<ChevronRight size={14} /></div></button>)}</div></section>
+          <section className="services"><div className="section-heading"><div><h2>Layanan utama</h2><p>Akses cepat layanan pemanfaatan data kependudukan</p></div><span className="section-meta">{signedIn ? "6 layanan tersedia" : "Layanan lembaga memerlukan login"}</span></div><div className="service-grid">{visibleModules.map((item, index) => <button className="service-card" key={item.id} style={{ animationDelay: `${index * 45}ms` }} onClick={() => navigate(item.id)}><div className="card-top"><span className={`service-icon ${item.color}`}><item.icon size={29} strokeWidth={1.7} /></span><span className="service-arrow"><ArrowRight size={19} /></span></div><h3>{item.name}</h3><p>{item.description}</p><div className="card-footer"><span className={`small-dot ${item.color}`} />{!signedIn && !isPublicModule(item.id) ? "Masuk untuk mengakses layanan" : item.count}<ChevronRight size={14} /></div></button>)}</div></section>
           <div className="bottom-grid"><section className="panel activity-panel"><div className="panel-heading"><h2>Aktivitas terbaru</h2><button className="text-button" onClick={() => navigate("monitoring")}>Lihat semua <ArrowRight size={14} /></button></div>{activity.map(item => <div className="activity-row" key={item.title}><span className={`activity-icon ${item.color}`}><item.icon size={19} /></span><div className="activity-text"><strong>{item.title}</strong><p>{item.detail}<span>·</span>{item.time}</p></div><Badge>{item.status}</Badge></div>)}</section><section className="panel announcement"><div className="panel-heading"><h2>Pengumuman</h2><span className="announcement-bell"><Bell size={17} /></span></div><span className="announcement-date">08 OKTOBER 2026</span><h3>Peningkatan layanan integrasi data</h3><p>Simulasi pemeliharaan layanan dijadwalkan pada 12 Oktober 2026, pukul 22.00–23.00 WIB.</p><button className="text-button" onClick={() => setSelected({ name: "Peningkatan layanan integrasi data", detail: "Pengumuman demo: pemeliharaan simulasi pada 12 Oktober 2026 pukul 22.00–23.00 WIB. Silakan menyesuaikan jadwal pengujian integrasi. Tidak ada layanan nyata yang terdampak.", date: "08 Okt 2026", status: "Terbit" })}>Baca selengkapnya <ArrowRight size={14} /></button></section></div>
         </>}
 
