@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useState, type FormEvent } from "react";
+import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowRight, Building2, Check, CircleHelp, Eye, EyeOff, KeyRound, Landmark, LockKeyhole, ShieldCheck, UserRound } from "lucide-react";
 import Emblem from "../components/emblem";
-import { DEMO_PASSWORD, DEMO_USERNAME, hasDemoSession, startDemoSession } from "../lib/demo-session";
+import { DEMO_PASSWORD, DEMO_USERNAME, startDemoSession } from "../lib/demo-session";
 
 export default function Login() {
   const router = useRouter();
@@ -14,7 +14,6 @@ export default function Login() {
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [help, setHelp] = useState(false);
-  useEffect(() => { if (hasDemoSession()) router.replace("/"); }, [router]);
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault(); setError("");
