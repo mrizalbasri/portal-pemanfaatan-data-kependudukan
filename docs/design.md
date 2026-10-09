@@ -10,4 +10,6 @@ Validasi: pemeriksaan TypeScript, build produksi, dan pemeriksaan browser bila t
 
 ## Tambahan login demo
 
+Terdapat dua akun demo: admin dengan akses lengkap dan user lembaga dengan lima menu (Beranda, Pengajuan PKS, Sandbox, Monitoring, Pengaduan). Kartu beranda, profil, aktivitas, dan tautan bantuan menyesuaikan peran. Pemeriksaan peran diterapkan pada navigasi dan tujuan URL. Tampilan awal publik tetap tiga menu dan tidak membutuhkan login.
+
 Halaman `/login` memakai logo Kemendagri dan akun demo. Alur terbaru sesuai permintaan pengguna: website langsung membuka beranda publik tanpa login dengan tiga navigasi, Beranda, Monitoring, dan Pengaduan. Layanan kelembagaan di beranda meminta login ketika diklik, termasuk PKS, Lembaga Pengguna, Prosedur, dan Sandbox. Tujuan disimpan di parameter `layanan` yang divalidasi melalui daftar modul; setelah login, layanan tersebut dibuka otomatis. Pengguna yang masuk melihat seluruh navigasi. Keluar dan reload kembali ke mode publik. Tidak ada backend atau autentikasi produksi. Validasi mencakup akses publik, pengalihan layanan terlindungi, login ke layanan yang dipilih, dan keluar.

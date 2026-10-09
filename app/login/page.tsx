@@ -4,8 +4,8 @@ import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowRight, Building2, Check, CircleHelp, Eye, EyeOff, KeyRound, Landmark, LockKeyhole, ShieldCheck, UserRound } from "lucide-react";
 import Emblem from "../components/emblem";
-import { DEMO_PASSWORD, DEMO_USERNAME, startDemoSession } from "../lib/demo-session";
-import { requestedModule } from "../lib/portal-access";
+import { DEMO_ACCOUNTS, startDemoSession, validateDemoCredentials } from "../lib/demo-session";
+import { canAccessModule, requestedModule } from "../lib/portal-access";
 import Link from "next/link";
 
 export default function Login() {
@@ -19,12 +19,13 @@ export default function Login() {
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault(); setError("");
-    if (username.trim() !== DEMO_USERNAME || password !== DEMO_PASSWORD) {
+    const account = validateDemoCredentials(username, password);
+    if (!account) {
       setError("Username atau kata sandi tidak sesuai. Silakan gunakan akun demo di bawah.");
       return;
     }
     setSubmitting(true);
-    try { startDemoSession(); const destination = requestedModule(window.location.search); router.replace(destination === "beranda" ? "/" : `/?layanan=${destination}`); }
+    try { startDemoSession(account); const destination = requestedModule(window.location.search); router.replace(destination === "beranda" || !canAccessModule(destination, account.role) ? "/" : `/?layanan=${destination}`); }
     catch { setError("Penyimpanan sesi tidak tersedia. Aktifkan penyimpanan situs di browser untuk mencoba login demo."); setSubmitting(false); }
   }
 
@@ -44,7 +45,7 @@ export default function Login() {
         {error && <p id="login-error" className="login-error" role="alert">{error}</p>}
         <button type="submit" className="login-submit" disabled={submitting}>{submitting ? "Membuka dashboard..." : "Masuk ke dashboard"}<ArrowRight size={18} /></button>
       </form>
-      <div className="login-divider"><span />COBA PORTAL DENGAN AKUN DEMO<span /></div><div className="demo-credentials"><div><span>Username</span><code>{DEMO_USERNAME}</code></div><div><span>Kata sandi</span><code>{DEMO_PASSWORD}</code></div><button type="button" onClick={() => { setUsername(DEMO_USERNAME); setPassword(DEMO_PASSWORD); setError(""); }}>Isi akun demo <ArrowRight size={14} /></button></div><p className="login-demo-note">Halaman demonstrasi dengan data dummy. Gunakan akun contoh, bukan kredensial pribadi Anda.</p>
+      <div className="login-divider"><span />PILIH AKUN DEMO<span /></div><div className="demo-account-list">{DEMO_ACCOUNTS.map(account => <div className="demo-credentials" key={account.username}><strong className="demo-account-title">{account.role === "admin" ? "Administrator · Menu lengkap" : "User Lembaga · 5 menu"}</strong><div><span>Username</span><code>{account.username}</code></div><div><span>Kata sandi</span><code>{account.password}</code></div><button type="button" onClick={() => { setUsername(account.username); setPassword(account.password); setError(""); }}>Isi akun {account.role === "admin" ? "admin" : "user"} <ArrowRight size={14} /></button></div>)}</div><p className="login-demo-note">Halaman demonstrasi dengan data dummy. Gunakan akun contoh, bukan kredensial pribadi Anda.</p>
     </div><footer className="login-footer">© 2026 Ditjen Dukcapil <span>Sistem Manajemen Kelembagaan</span></footer></section>
   </div>;
 }
